@@ -4,10 +4,19 @@ import re
 
 # <https://api.github.com/repositories/45717250/forks?sort=oldest&page=2>; rel="next", <https://api.github.com/repositories/45717250/forks?sort=oldest&page=442>; rel="last"
 def getNextLink(link):
-  links = re.split('<|>', link)
-  # links = link.split('< >')
-  print links
-  return (links[1], links[-2])
+  ex_next = '.*<([^<>]+)>; rel="next".*'
+  ex_last = '.*<([^<>]+)>; rel="last".*'
+
+  mn = re.match(ex_next, link)
+  ml = re.match(ex_last, link)
+
+  next_link = ''
+  last_link = ''
+
+  if mn: next_link = mn.group(1)
+  if ml: last_link = ml.group(1)
+
+  return (next_link, last_link)
 
 """
 u 'owner': {
@@ -35,15 +44,25 @@ def getFork(value):
   owner_url = value['owner']['url']
   return (stargazers_count, owner_url)
 
+import sys
 import json
 import urllib2
+import urlparse
 
-def getNextPage(url):
+def getNextPage(url, access_token):
+  if access_token != '':
+    url += '&access_token=' + access_token
+
   response = urllib2.urlopen(url)
   (next_link, last_link) = getNextLink(response.headers['Link'])
   ratelimit_remain = int(response.headers['X-RateLimit-Remaining'])
-  index = int(next_link.split('=')[-1]) - 1
-  last_index = int(last_link.split('=')[-1])
+
+  parts = urlparse.parse_qs(next_link)
+  index = int(parts['page'][0])
+
+
+  last_parts = urlparse.parse_qs(last_link)
+  last_index = int(last_parts['page'][0])
 
   data = response.read()
   values = json.loads(data)
@@ -53,16 +72,46 @@ def getNextPage(url):
     owner = getFork(value)
     owners.append(owner)
 
-  return (ratelimit_remain, owners, next_link)
+  return (ratelimit_remain, owners, next_link, last_link)
 
-next_link = "https://api.github.com/repos/tensorflow/tensorflow/forks?sort=oldest"
+
+from pprint import pprint
+
+access_token = ''
+if len(sys.argv) > 1:
+  access_token = sys.argv[1]
+
+next_link = "https://api.github.com/repos/tensorflow/tensorflow/forks?sort=oldest" # &page=440"
+
+next_next_link = next_link
+last_link = ''
+
 ratelimit_remain = 100
 owners = []
 
-while ratelimit_remain > 45:
-  (ratelimit_remain, new_owners, url) = getNextPage(next_link)
+while ratelimit_remain > 45 and next_link != last_link:
+  print 'ratelimit_remain', ratelimit_remain
+  print 'next_link', next_link
+
+  sys.stdout.flush()
+
+  (ratelimit_remain, new_owners, next_next_link, last_link) = getNextPage(next_link, access_token)
   owners.extend(new_owners)
 
-print ratelimit_remain
-print next_link
-print owners
+  next_link = next_next_link
+
+uniq_owners = {}
+for owner in owners:
+  (stars, owner_url) = owner
+  if owner_url not in owners:
+    uniq_owners[owner_url] = (int(stars), 0)
+  else:
+    (pre_stars, count) = uniq_owners[owner_url]
+    uniq_owners[owner_url] = (pre_stars + int(stars), count + 1)
+
+if len(sys.argv) > 2:
+  with open(sys.argv[2], 'w') as outfile:
+    json.dump(uniq_owners, outfile, indent=2) 
+else:
+ pprint(uniq_owners)
+
