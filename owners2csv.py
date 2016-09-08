@@ -15,9 +15,11 @@ for (url, owner) in owner_map.items():
   # print 'owner:', owner
   if w is None:
     w = csv.DictWriter(f, owner.keys())
-    w.writeheader()
+    # w.writeheader()
 
-  uni = ['name', 'company', 'location', 'blog']
+  # print 'name: ', owner['subscriptions_url']
+
+  uni = ['name', 'company', 'location', 'blog', 'bio']
   for u in uni:
     if owner[u] is not None:
       owner[u] = owner[u].encode('utf-8')
