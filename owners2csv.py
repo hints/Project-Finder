@@ -15,7 +15,7 @@ for (url, owner) in owner_map.items():
   # print 'owner:', owner
   if w is None:
     w = csv.DictWriter(f, owner.keys())
-    # w.writeheader()
+    w.writeheader()
 
   # print 'name: ', owner['subscriptions_url']
 
