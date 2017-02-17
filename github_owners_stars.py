@@ -9,6 +9,27 @@ from pprint import pprint
 
 RATE_LIMIT = 500
 
+HEADER = None
+
+def readCsvUrls(blacklist_file):
+  csvfile = open(blacklist_file, 'rb')
+  ireader = csv.reader(csvfile)
+
+  headers = ireader.next()
+  index = {}
+  i = 0
+  for h in headers:
+    index[h] = i
+    i+=1
+
+  u_i = index['url']
+  urls = []
+
+  for o in ireader:
+    urls.append(o[u_i])
+
+  return urls 
+
 if len(sys.argv) <= 1:
   sys.exit(1)
 
@@ -17,17 +38,15 @@ filename = sys.argv[2]
 
 print filename
 
-HEADER = None
-
 with open(filename) as json_file:
-  owner_map = json.load(json_file)
+  owners = json.load(json_file)
 
-owners = {}
+blacklist = sys.argv[3]
+b_urls = readCsvUrls(blacklist)
 
 start_url = ''
-
-if len(sys.argv) > 4:
-  start_url = sys.argv[4]
+if len(sys.argv) > 5:
+  start_url = sys.argv[5]
 
 skip = False
 
@@ -36,15 +55,20 @@ if start_url != '':
 
 o_owner_map = {}
 
-outfile = open(sys.argv[3], 'w')
-iwriter = csv.writer(outfile)
+if len(sys.argv) > 4:
+  outfile = open(sys.argv[4], 'w')
+  iwriter = csv.writer(outfile)
 
-for url in sorted(owner_map):
+for owner in owners:
+  url = owner['url']
+
   if skip:
     if start_url == url: skip = False
     else: continue
 
   print 'url', url
+  if url in b_urls:
+    continue
 
   r_url = url
   if access_token != '':
@@ -56,13 +80,6 @@ for url in sorted(owner_map):
   except Exception:
     print 'failed to process', url
     pass
-
-  (stars, forks) = owner_map[url]
-
-  owner['projfinder_fork_stars'] = stars
-  owner['projfinder_fork_count'] = forks
-
-  o_owner_map[url] = owner
 
   ratelimit_remain = int(response.headers['X-RateLimit-Remaining'])
   print 'ratelimit_remain', ratelimit_remain
@@ -78,17 +95,12 @@ for url in sorted(owner_map):
       HEADER.append(o)
     iwriter.writerow(HEADER)
 
-if len(sys.argv) > 3:
-  for o in o_owner_map:
-    row = []
-    for k in o_owner_map[o]:
-      if isinstance(o_owner_map[o][k], basestring):
-        row.append(o_owner_map[o][k].encode('utf-8'))
-      else:
-        row.append(o_owner_map[o][k])
+  row = []
+  for o in owner:
+    if isinstance(owner[o], basestring):
+      row.append(owner[o].encode('utf-8'))
+    else:
+      row.append(owner[o])
 
-    iwriter.writerow(row)
-else:
-  pprint(o_owner_map)
+  iwriter.writerow(row)
 
-print 'owners', len(o_owner_map)

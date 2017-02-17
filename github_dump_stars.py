@@ -66,7 +66,6 @@ def getNextPage(url, access_token):
   parts = urlparse.parse_qs(next_link)
   index = int(parts['page'][0])
 
-
   last_parts = urlparse.parse_qs(last_link)
   last_index = int(last_parts['page'][0])
 
@@ -109,15 +108,6 @@ while ratelimit_remain > 45 and next_link != last_link:
 
   next_link = next_next_link
 
-uniq_owners = {}
-for owner in owners:
-  (stars, owner_url) = owner
-  if owner_url not in owners:
-    uniq_owners[owner_url] = (int(stars), 0)
-  else:
-    (pre_stars, count) = uniq_owners[owner_url]
-    uniq_owners[owner_url] = (pre_stars + int(stars), count + 1)
-
 if len(sys.argv) > 2:
   with open(sys.argv[2], 'w') as outfile:
-    json.dump(uniq_owners, outfile, indent=2) 
+    json.dump(owners, outfile, indent=2)
